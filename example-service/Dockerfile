@@ -1,0 +1,6 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY app.py .
+ENV PORT=31337 PYTHONUNBUFFERED=1
+EXPOSE 31337
+CMD ["python", "app.py"]

@@ -1,0 +1,31 @@
+# Demo: two copies of example-service behind the balancer.
+#   docker compose -f docker-compose.example.yml up -d --build
+# Only the balancer publishes ports; backends are reachable by name inside the network.
+services:
+  svc-patched:
+    build: ../example-service
+    environment:
+      PATCHED: "1"          # backdoor removed
+    restart: unless-stopped
+
+  svc-honeypot:
+    build: ../example-service
+    environment:
+      PATCHED: "0"          # still vulnerable, but never holds real flags
+    restart: unless-stopped
+
+  balancer:
+    build: .
+    ports:
+      - "31337:31337"   # rules/http_example.py  (HTTP  -> svc-patched / honeypot)
+      - "31338:31338"   # rules/https_example.py (HTTPS -> svc-patched)
+      - "31339:31339"   # rules/tcp_example.py   (TCP   -> svc-honeypot)
+    volumes:
+      - ./rules:/rules:ro
+      - ./certs:/certs:ro
+    cap_add:
+      - NET_ADMIN   # optional: silent Drop (TCP_REPAIR)
+    restart: unless-stopped
+    depends_on:
+      - svc-patched
+      - svc-honeypot

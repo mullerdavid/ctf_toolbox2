@@ -1,0 +1,28 @@
+# The balancer on its own. Rules in ./rules decide what it listens on and
+# where traffic goes. For a demo with backends see docker-compose.example.yml.
+services:
+  balancer:
+    build: .
+    ports:
+      # Publish every port your rules listen on (changing PORT in a rule
+      # rebinds inside the container, but compose only forwards these).
+      - "31337:31337"
+      - "31338:31338"
+      - "31339:31339"
+    volumes:
+      - ./rules:/rules:ro
+      - ./certs:/certs:ro
+    environment:
+      LB_TCP_TIMEOUT: "180"   # TCP idle timeout in seconds, 0 = off
+    # Optional: lets Drop() release sockets via TCP_REPAIR without FIN/RST.
+    # Remove if the host doesn't allow it; dropped sockets are then held
+    # manually until DROP_TIMEOUT instead.
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    # To reach backends of another compose project by name, join its network:
+    # networks: [svc]
+# networks:
+#   svc:
+#     external: true
+#     name: <project>_default
