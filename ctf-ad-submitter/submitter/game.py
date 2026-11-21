@@ -68,22 +68,60 @@ async def fetch_teams(cfg, tick: int, give_up_at: float):
 
 
 def targets_for(cfg, teams: dict, service: str) -> list:
-    """The stdin payload targets for one service."""
-    ids_by_team = (teams.get("flag_ids") or {}).get(service) or {}
+    """Build stdin payload targets for one service from the teams payload."""
+
+    team_records = teams.get("teams") or []
+    service_flags = (teams.get("flags") or {}).get(service) or {}
+
     out = []
-    for team in teams.get("teams", []):
+
+    for team in team_records:
+        if not isinstance(team, dict):
+            continue
+
         try:
-            team = int(team)
+            team_id = int(team.get("id"))
         except (TypeError, ValueError):
             continue
-        if team == cfg.TEAM_ID or (team == cfg.NOP_TEAM and not cfg.ATTACK_NOP):
+
+        address = team.get("address")
+        if not address:
             continue
-        ids = ids_by_team.get(str(team), [])
-        if not isinstance(ids, list):
-            ids = [ids]
+
+        if team_id == cfg.TEAM_ID:
+            continue
+
+        if team_id == cfg.NOP_TEAM and not cfg.ATTACK_NOP:
+            continue
+
+        ticks = service_flags.get(address) or {}
+        if not isinstance(ticks, dict):
+            continue
+
         if cfg.LAST_TICKS:
-            ids = ids[-cfg.LAST_TICKS:]
-        out.append({"team": team, "ip": cfg.team_ip(team), "flag_ids": ids})
+            tick_keys = sorted(ticks, key=lambda value: int(value))[-cfg.LAST_TICKS:]
+        else:
+            tick_keys = sorted(ticks, key=lambda value: int(value))
+
+        flag_ids: list[str] = []
+
+        for tick in tick_keys:
+            vulnerabilities = ticks.get(tick) or {}
+            if not isinstance(vulnerabilities, dict):
+                continue
+
+            for ids in vulnerabilities.values():
+                if isinstance(ids, list):
+                    flag_ids.extend(str(flag_id) for flag_id in ids)
+                elif ids is not None:
+                    flag_ids.append(str(ids))
+
+        out.append({
+            "team": team_id,
+            "ip": address,
+            "flag_ids": flag_ids,
+        })
+
     return out
 
 
